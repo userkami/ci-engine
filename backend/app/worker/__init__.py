@@ -1,0 +1,1 @@
+"""Celery worker package: async research job execution + progress streaming."""

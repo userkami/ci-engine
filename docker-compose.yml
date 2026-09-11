@@ -1,0 +1,138 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ci_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ci_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace_with_strong_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ci_database}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ci_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 600M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ci_admin} -d ${POSTGRES_DB:-ci_database}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ci_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ci_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 300M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ci_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - ci_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ci_celery_worker
+    restart: unless-stopped
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - ci_network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 2500M
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ci_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      - ci_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+networks:
+  ci_network:
+    name: ci_network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: ci_postgres_data
+  redis_data:
+    name: ci_redis_data

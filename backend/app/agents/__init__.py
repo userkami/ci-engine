@@ -1,0 +1,1 @@
+"""Agent pipeline package (LangGraph competitive intelligence engine)."""

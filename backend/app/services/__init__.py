@@ -1,0 +1,1 @@
+"""Service layer for the Competitive Intelligence backend."""

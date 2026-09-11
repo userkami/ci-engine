@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * shadcn/ui-style design tokens (HSL triplets -> consumed by
+ * tailwind.config.ts). `.dark` variants mirror the obsession of the
+ * light palette with nicer monochrome contrast.
+ */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210.2 40% 98%;
+  --secondary: 210.2 40% 96.1%;
+  --secondary-foreground: 222.2 47.6% 15.9%;
+  --muted: 210.2 40% 96.1%;
+  --muted-foreground: 215.8 16.3% 46.9%;
+  --accent: 210.2 96.4% 95.7%;
+  --accent-foreground: 222.2 87.7% 18.4%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210.2 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 215.2 96.8% 48.7%;
+  --radius: 0.5rem;
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", monospace;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210.2 40% 98%;
+  --card: 222.2 84% 6%;
+  --card-foreground: 210.2 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210.2 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 210.2 40% 98%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210.2 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215.8 16.3% 60%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210.2 40% 98%;
+  --destructive: 0 62.8% 50.6%;
+  --destructive-foreground: 210.2 40% 98%;
+  --border: 217.2 32.6% 24.5%;
+  --input: 217.2 32.6% 24.5%;
+  --ring: 224.5 93.5% 55.8%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/*
+ * Print stylesheet for PDF exports (BUILD_GUIDE Phase 5).
+ * Radix Tabs hide inactive panels via the `hidden` attribute: when
+ * printing we force every panel visible so the whole battlecard
+ * exports. Interactive chrome is hidden with `print:hidden`.
+ */
+@media print {
+  [hidden] {
+    display: block !important;
+  }
+  body {
+    background-color: white;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}
