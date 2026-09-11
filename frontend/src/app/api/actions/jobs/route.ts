@@ -37,9 +37,9 @@ function errorMessage(err: unknown): string {
 function errorStatus(err: unknown): number {
   if (
     err instanceof Error &&
-    typeof (err as { status?: unknown }).status === "number"
+    typeof (err as unknown as { status?: unknown }).status === "number"
   ) {
-    return (err as { status: number }).status;
+    return (err as unknown as { status: number }).status;
   }
   return 500;
 }

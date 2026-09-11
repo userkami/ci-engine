@@ -12,8 +12,8 @@ const SWOT_KEYS: Array<["strengths" | "weaknesses" | "opportunities" | "threats"
 
 export function battlecardToMarkdown(
   card: BattlecardOutput,
-  target?: string,
-  competitor?: string,
+  target?: string | null,
+  competitor?: string | null,
 ): string {
   const lines: string[] = [];
   const title =

@@ -16,8 +16,8 @@ export async function GET(
   } catch (err) {
     const status =
       err instanceof Error &&
-      typeof (err as { status?: unknown }).status === "number"
-        ? (err as { status: number }).status
+      typeof (err as unknown as { status?: unknown }).status === "number"
+        ? (err as unknown as { status: number }).status
         : 500;
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong" },

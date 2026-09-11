@@ -19,7 +19,8 @@ export const authOptions: NextAuthOptions = {
     maxAge: 60 * 60 * 24 * 7, // 7 days
   },
   secret: process.env.NEXTAUTH_SECRET,
-  trustHost: true, // Coolify / reverse proxies
+  // NOTE: v4 has no `trustHost` option (that is Auth.js v5). Host trust for
+  // Coolify / reverse proxies is handled by setting NEXTAUTH_URL in .env.
   pages: {
     signIn: "/",
   },
