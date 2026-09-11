@@ -83,4 +83,6 @@ Every user starts with **5 free credits**. One research job costs **5 credits**,
 
 ## Deployment
 
+For Coolify, use [`docker-compose.coolify.yml`](./docker-compose.coolify.yml) and follow [`COOLIFY.md`](./COOLIFY.md). This configuration exposes only the frontend, uses explicit runtime variables, and runs migrations before the API starts.
+
 Designed for a single 4 vCPU / 8 GB VPS via [Coolify](https://coolify.io) — container CPU/memory limits are pre-tuned in [`docker-compose.yml`](./docker-compose.yml) (Postgres 600 MB · Redis 300 MB · backend 1 GB · worker 2.5 GB · frontend 1 GB).

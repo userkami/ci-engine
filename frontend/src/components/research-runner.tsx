@@ -2,6 +2,7 @@
 
 import { ArrowRight, Loader, Search, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { actionUrl } from "@/lib/api";
 import type { BattlecardRecord } from "@/types";
@@ -19,6 +20,7 @@ type Phase = "idle" | "submitting" | "running" | "done" | "error";
  * flows through the /api/actions server routes.
  */
 export function ResearchRunner() {
+  const router = useRouter();
   const [target, setTarget] = useState("");
   const [competitor, setCompetitor] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -56,6 +58,7 @@ export function ResearchRunner() {
       }
       setJobId(body.job_id);
       setPhase("running");
+      router.refresh();
     } catch {
       setErrorMsg("Network error while starting the research job.");
       setPhase("error");

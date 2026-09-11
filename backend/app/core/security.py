@@ -8,6 +8,7 @@ verifies signature/claims and resolves the user from the database.
 from __future__ import annotations
 
 import os
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -21,6 +22,17 @@ from app.models import User
 
 ALGORITHM = "HS256"
 ISSUER = "ci-backend"
+
+
+async def require_internal_auth(
+    x_internal_api_secret: Optional[str] = Header(default=None),
+) -> None:
+    """Only the authenticated frontend server may provision identities."""
+    expected = os.getenv("INTERNAL_API_SECRET", "").strip()
+    if len(expected) < 32 or "replace_with" in expected:
+        raise HTTPException(status_code=503, detail="Identity service not configured")
+    if not secrets.compare_digest(x_internal_api_secret or "", expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 def _require_jwt_secret() -> str:

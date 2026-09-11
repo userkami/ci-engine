@@ -1,0 +1,99 @@
+# Select this file in Coolify's Git-based Docker Compose build pack.
+# Assign a domain ONLY to frontend, using container port 3000.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ci_admin
+      POSTGRES_DB: ci_database
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ci_admin -d ci_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 600m
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 300m
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # Complete migrations before the API becomes healthy and workers start.
+    command: [sh, -c, "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    environment: &backend_environment
+      DATABASE_URL: postgresql+asyncpg://ci_admin:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/ci_database
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET}
+      CORS_ORIGINS: ${NEXTAUTH_URL:?Set NEXTAUTH_URL}
+      LLM_FAST_MODEL: ${LLM_FAST_MODEL:-google_genai:gemini-2.5-flash}
+      LLM_HEAVY_MODEL: ${LLM_HEAVY_MODEL:-google_genai:gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:?Set TAVILY_API_KEY}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8000/health]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    mem_limit: 1g
+
+  celery_worker:
+    build: ./backend
+    restart: unless-stopped
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+    environment: *backend_environment
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 2500m
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_PROXY_URL: http://backend:8000
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: 1g
+
+volumes:
+  postgres_data:
+  redis_data:

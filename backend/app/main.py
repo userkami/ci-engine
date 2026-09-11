@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.redis_client import close_redis, get_redis
-from app.core.security import create_access_token, get_current_user
+from app.core.security import create_access_token, get_current_user, require_internal_auth
 from app.database import AsyncSessionFactory, dispose_engine, get_db
 from app.models import (
     JOB_COST_CREDITS,
@@ -102,6 +102,7 @@ async def health() -> dict:
 # --------------------------------------------------------------------------- #
 @app.post(
     "/api/auth/provision",
+    dependencies=[Depends(require_internal_auth)],
     response_model=OAuthProvisionResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -301,7 +302,7 @@ async def _progress_event_source(job_id: uuid.UUID) -> AsyncGenerator[str, None]
             _progress_payload(
                 status_now,
                 _TERMINAL_MESSAGES[status_now],
-                {"error": error_now} if status_now == "failed" else None,
+                {"error": error_now} if status_now == "failed" else await _completed_data(job_id),
             )
         )
         return
@@ -362,7 +363,7 @@ async def _progress_event_source(job_id: uuid.UUID) -> AsyncGenerator[str, None]
             if status_now == "completed":
                 yield _sse_frame(
                     _progress_payload(
-                        "completed", _TERMINAL_MESSAGES["completed"]
+                        "completed", _TERMINAL_MESSAGES["completed"], await _completed_data(job_id)
                     )
                 )
                 return
@@ -386,14 +387,23 @@ async def _progress_event_source(job_id: uuid.UUID) -> AsyncGenerator[str, None]
                 logger.warning("could not unsubscribe from %s", channel)
 
 
+async def _completed_data(job_id: uuid.UUID) -> dict:
+    async with AsyncSessionFactory() as session:
+        card_id = (await session.execute(
+            select(Battlecard.id).where(Battlecard.job_id == job_id)
+        )).scalar_one_or_none()
+        return {"battlecard_id": str(card_id)} if card_id else {}
+
+
 @app.get("/api/jobs/{job_id}/stream")
 async def stream_job_progress(
     job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """SSE stream of real-time progress for a research job (SPEC.md §6)."""
     job = await db.get(ResearchJob, job_id)
-    if job is None:
+    if job is None or job.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )

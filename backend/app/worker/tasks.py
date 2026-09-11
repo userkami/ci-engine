@@ -21,7 +21,8 @@ from typing import Any, Optional
 
 from app.agents.ci_graph import build_ci_graph
 from app.agents.nodes import reset_progress_hook, set_progress_hook
-from app.database import AsyncSessionFactory
+from app.database import AsyncSessionFactory, dispose_engine
+from app.core.redis_client import close_redis
 from app.models import Battlecard, ResearchJob, ResearchJobStatus
 from app.worker.celery_app import celery_app
 from app.worker.progress import ProgressPublisher
@@ -59,7 +60,18 @@ def execute_research_job(
     Transport-level failures (broker/network) are auto-retried by Celery;
     application errors are surfaced once and the job is marked ``failed``.
     """
-    return asyncio.run(_run_research_job(job_id, target, competitor, user_id))
+    async def run_and_cleanup():
+        try:
+            return await _run_research_job(job_id, target, competitor, user_id)
+        finally:
+            # Each Celery invocation creates a new loop. Do not carry pooled
+            # asyncpg/Redis connections into the next task's event loop.
+            try:
+                await close_redis()
+            finally:
+                await dispose_engine()
+
+    return asyncio.run(run_and_cleanup())
 
 
 def _seed_state(target: str, competitor: str) -> dict:

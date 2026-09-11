@@ -39,10 +39,14 @@ export async function provisionBackendIdentity(): Promise<ProvisionResult> {
   if (!session?.user?.email) {
     throw new BackendRequestError("You must be signed in", 401);
   }
+  const internalSecret = process.env.INTERNAL_API_SECRET?.trim();
+  if (!internalSecret || internalSecret.length < 32 || internalSecret.includes("replace_with")) {
+    throw new BackendRequestError("Identity service not configured", 503);
+  }
   const res = await fetch(`${BACKEND_URL}/api/auth/provision`, {
     method: "POST",
     cache: "no-store",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Internal-Api-Secret": internalSecret },
     body: JSON.stringify({
       email: session.user.email,
       name: session.user.name,
