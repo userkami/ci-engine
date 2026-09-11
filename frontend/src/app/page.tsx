@@ -1,10 +1,11 @@
+import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { ArrowRight, Search, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { DemoGallery } from "@/components/demo-gallery";
+import { SignInButton } from "@/components/sign-in-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,7 +17,6 @@ import { authOptions } from "@/lib/auth";
 
 export default async function LandingPage() {
   const session = await getServerSession(authOptions);
-  const ctaHref = session?.user ? "/dashboard" : "/api/auth/signin";
 
   return (
     <div className="space-y-12">
@@ -31,13 +31,19 @@ export default async function LandingPage() {
           assembles a citation-backed battlecard in minutes, not weeks.
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href={ctaHref}
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            {session?.user ? "Open dashboard" : "Sign in with Google"}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          {session?.user ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Open dashboard
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          ) : (
+            <Suspense fallback={null}>
+              <SignInButton />
+            </Suspense>
+          )}
           <Link
             href="/samples/linear-vs-jira"
             className="inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium hover:bg-accent"
