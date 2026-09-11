@@ -182,3 +182,23 @@ class Battlecard(Base):
 
     job: Mapped[ResearchJob] = relationship(back_populates="battlecard")
     user: Mapped[User] = relationship(back_populates="battlecards")
+
+
+class RuntimeConfig(Base):
+    """Key-value store for runtime configuration overrides.
+
+    Values stored here take precedence over environment variables and are
+    read at call time, so changes take effect immediately without restart.
+    Used by the admin configuration UI to manage model selection and API keys.
+    """
+
+    __tablename__ = "runtime_config"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=func.now(),
+    )

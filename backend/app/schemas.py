@@ -87,3 +87,36 @@ class AdminCreditTopUpResponse(BaseModel):
     email: str
     user_id: uuid.UUID
     balance: int
+
+
+class AdminConfigEntry(BaseModel):
+    """A single configuration entry returned by the admin API."""
+
+    value: str
+    source: str  # "database", "environment", or "none"
+
+
+class AdminConfigResponse(BaseModel):
+    """All managed config entries."""
+
+    config: dict[str, AdminConfigEntry]
+
+
+class AdminConfigUpdateRequest(BaseModel):
+    """Update one or more config entries."""
+
+    updates: dict[str, str]
+
+
+class AdminConfigTestRequest(BaseModel):
+    """Test a model configuration by making a minimal LLM call."""
+
+    role: str = Field("fast", pattern="^(fast|heavy)$")
+    model_spec: str = Field(..., min_length=1, max_length=200)
+
+
+class AdminConfigTestResponse(BaseModel):
+    """Result of a config test."""
+
+    ok: bool
+    message: str

@@ -36,6 +36,11 @@ from app.models import (
     UserCredit,
 )
 from app.schemas import (
+    AdminConfigEntry,
+    AdminConfigResponse,
+    AdminConfigTestRequest,
+    AdminConfigTestResponse,
+    AdminConfigUpdateRequest,
     AdminCreditTopUpRequest,
     AdminCreditTopUpResponse,
     BattlecardResponse,
@@ -44,6 +49,7 @@ from app.schemas import (
     OAuthProvisionRequest,
     OAuthProvisionResponse,
 )
+from app.core import config_service
 from app.services.credit_service import deduct_credits, restore_credits
 from app.worker.tasks import execute_research_job
 
@@ -456,6 +462,106 @@ async def admin_top_up_credits(
         user_id=user.id,
         balance=new_balance,
     )
+# --------------------------------------------------------------------------- #
+# Admin configuration API  (operator-only runtime config)
+# --------------------------------------------------------------------------- #
+@app.get(
+    "/api/admin/config",
+    dependencies=[Depends(require_admin_auth)],
+    response_model=AdminConfigResponse,
+)
+async def admin_get_config() -> AdminConfigResponse:
+    """Return all managed config keys with their effective values.
+
+    Requires the ``X-Admin-Token`` header. Values sourced from the database
+    indicate an admin override; values from env vars show the fallback.
+    """
+    entries = await config_service.list_config()
+    return AdminConfigResponse(
+        config={
+            key: AdminConfigEntry(value=info["value"], source=info["source"])
+            for key, info in entries.items()
+        }
+    )
+
+
+@app.put(
+    "/api/admin/config",
+    dependencies=[Depends(require_admin_auth)],
+)
+async def admin_update_config(
+    body: AdminConfigUpdateRequest,
+) -> AdminConfigResponse:
+    """Update one or more runtime config entries.
+
+    Requires the ``X-Admin-Token`` header. Values are persisted to the
+    database and take effect immediately (read at call time).
+    Use an empty string to clear an override and revert to the env var.
+    """
+    for key, value in body.updates.items():
+        if key not in config_service.MANAGED_KEYS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown config key: {key}",
+            )
+        if value == "":
+            await config_service.delete_config(key)
+        else:
+            await config_service.set_config(key, value)
+
+    entries = await config_service.list_config()
+    return AdminConfigResponse(
+        config={
+            key: AdminConfigEntry(value=info["value"], source=info["source"])
+            for key, info in entries.items()
+        }
+    )
+
+
+@app.post(
+    "/api/admin/config/test",
+    dependencies=[Depends(require_admin_auth)],
+    response_model=AdminConfigTestResponse,
+)
+async def admin_test_config(
+    body: AdminConfigTestRequest,
+) -> AdminConfigTestResponse:
+    """Test a model configuration by making a minimal LLM call.
+
+    Requires the ``X-Admin-Token`` header. Tries to instantiate the model
+    and send a one-token "ping" prompt to verify the config works before
+    saving it. The config is NOT persisted — use PUT to save afterwards.
+    """
+    from langchain.chat_models import init_chat_model
+    from langchain_core.messages import HumanMessage
+
+    from app.core.llm import _apply_provider_overrides, _split_model_spec
+
+    model, provider = _split_model_spec(body.model_spec.strip())
+    model_kwargs: dict = {"temperature": 0.0}
+    await _apply_provider_overrides(provider, model_kwargs)
+
+    try:
+        instance = init_chat_model(model, model_provider=provider, **model_kwargs)
+    except Exception as exc:
+        return AdminConfigTestResponse(
+            ok=False,
+            message=f"Failed to initialise model: {exc}",
+        )
+
+    try:
+        response = await instance.ainvoke([HumanMessage(content="ping")])
+        return AdminConfigTestResponse(
+            ok=True,
+            message=f"Model responded: {str(response.content)[:100]}",
+        )
+    except Exception as exc:
+        return AdminConfigTestResponse(
+            ok=False,
+            message=f"Model initialised but invocation failed: {exc}",
+        )
+
+
 async def get_battlecard(
     battlecard_id: uuid.UUID,
     user: User = Depends(get_current_user),

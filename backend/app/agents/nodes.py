@@ -146,7 +146,7 @@ async def _generate_sub_queries(target: str, competitor: str) -> List[str]:
         for t in PLANNER_TEMPLATES
     ]
     try:
-        model = get_chat_model("fast")
+        model = await get_chat_model("fast")
         messages = [
             SystemMessage(
                 content=(
@@ -404,7 +404,7 @@ async def synthesis_node(state: dict) -> dict:
     )
 
     messages = _build_synthesis_prompt(target, competitor, corpus, flags)
-    model = get_chat_model("heavy")
+    model = await get_chat_model("heavy")
     structured = model.with_structured_output(BattlecardOutput)
     response = await structured.ainvoke(messages)  # type: ignore[union-attr]
     battlecard = _coerce_structured_output(response, BattlecardOutput)
