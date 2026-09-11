@@ -69,3 +69,21 @@ class OAuthProvisionResponse(BaseModel):
     user_id: uuid.UUID
     email: str
     balance: int
+
+
+class AdminCreditTopUpRequest(BaseModel):
+    """Body for ``POST /api/admin/credits`` (operator-only top-up).
+
+    ``amount`` is capped so a leaked token cannot mint absurd balances.
+    """
+
+    email: str = Field(..., min_length=3, max_length=255)
+    amount: int = Field(..., ge=1, le=10_000)
+
+
+class AdminCreditTopUpResponse(BaseModel):
+    """New balance after a successful admin top-up."""
+
+    email: str
+    user_id: uuid.UUID
+    balance: int

@@ -87,13 +87,15 @@ async def restore_credits(
     session: AsyncSession,
     user_id: uuid.UUID,
     amount: int,
-) -> None:
+) -> int:
     """Atomically add ``amount`` back to ``user_id`` (compensation).
 
     Used to refund a deduction when job dispatch fails (POST
     ``/api/jobs/create``). Locks the row the same way as
     :func:`deduct_credits` so concurrent ledger operations stay safe.
     Creates the profile row when missing so refunds never get lost.
+
+    Returns the new balance after the credit has been applied.
 
     Raises ``ValueError`` when ``amount`` is not a positive integer.
     """
@@ -112,6 +114,7 @@ async def restore_credits(
         await session.flush()
     row.balance += amount
     await session.commit()
+    return row.balance
 
 
 async def get_credit_balance(

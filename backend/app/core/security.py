@@ -35,6 +35,23 @@ async def require_internal_auth(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+async def require_admin_auth(
+    x_admin_token: Optional[str] = Header(default=None),
+) -> None:
+    """Only operators holding ``ADMIN_TOKEN`` may use admin endpoints.
+
+    Used for credit top-ups during testing / support. The token is an
+    independent long random string (>= 32 chars) set via the ``ADMIN_TOKEN``
+    environment variable; it is deliberately separate from
+    ``INTERNAL_API_SECRET`` so leaking one never unlocks the other.
+    """
+    expected = os.getenv("ADMIN_TOKEN", "").strip()
+    if len(expected) < 32 or "replace_with" in expected:
+        raise HTTPException(status_code=503, detail="Admin API not configured")
+    if not secrets.compare_digest(x_admin_token or "", expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 def _require_jwt_secret() -> str:
     secret = os.getenv("JWT_SECRET", "").strip()
     if not secret or "replace_with" in secret:

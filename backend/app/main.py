@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.redis_client import close_redis, get_redis
-from app.core.security import create_access_token, get_current_user, require_internal_auth
+from app.core.security import create_access_token, get_current_user, require_admin_auth, require_internal_auth
 from app.database import AsyncSessionFactory, dispose_engine, get_db
 from app.models import (
     JOB_COST_CREDITS,
@@ -36,6 +36,8 @@ from app.models import (
     UserCredit,
 )
 from app.schemas import (
+    AdminCreditTopUpRequest,
+    AdminCreditTopUpResponse,
     BattlecardResponse,
     JobCreateRequest,
     JobCreateResponse,
@@ -418,7 +420,42 @@ async def stream_job_progress(
     )
 
 
-@app.get("/api/battlecards/{battlecard_id}", response_model=BattlecardResponse)
+@app.post(
+    "/api/admin/credits",
+    dependencies=[Depends(require_admin_auth)],
+    response_model=AdminCreditTopUpResponse,
+)
+async def admin_top_up_credits(
+    body: AdminCreditTopUpRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AdminCreditTopUpResponse:
+    """Operator-only: add credits to a user identified by email.
+
+    Requires the ``X-Admin-Token`` header matching ``ADMIN_TOKEN``.
+    Used for support / testing only.
+    """
+    from sqlalchemy import select
+
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No user found with email {body.email}",
+        )
+
+    # Reuse the idempotent credit upsert from the provision path so a
+    # missing row is created with the default balance before applying delta.
+    from app.services.credit_service import restore_credits
+
+    new_balance = await restore_credits(db, user.id, body.amount)
+    await db.commit()
+
+    return AdminCreditTopUpResponse(
+        email=body.email,
+        user_id=user.id,
+        balance=new_balance,
+    )
 async def get_battlecard(
     battlecard_id: uuid.UUID,
     user: User = Depends(get_current_user),
