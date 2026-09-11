@@ -93,10 +93,13 @@ export function ResearchRunner() {
         return;
       }
     }
+    const detail = (result.data as { error?: string } | null)?.error;
     setErrorMsg(
-      result.message
-        ? `Research failed: ${result.message}`
-        : "Research failed. Please try again.",
+      detail
+        ? `Research failed: ${detail}`
+        : result.message
+          ? `Research failed: ${result.message}`
+          : "Research failed. Please try again.",
     );
     setPhase("error");
   }
