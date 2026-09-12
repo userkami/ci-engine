@@ -9,7 +9,7 @@ import { ApiKeysPanel, CEntry, CState, ModelPanel } from "./panels";
 
 const TK = "ci_admin_token";
 
-export function AdminPage() {
+function AdminPage() {
   const [token, setToken] = useState("");
   const [config, setConfig] = useState<CState | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -26,7 +26,7 @@ export function AdminPage() {
     if (!token) return;
     setLoading(true); setMsg(null);
     try {
-      const r = await fetch("/api/actions/admin/config", { headers: { "x-admin-token": token } });
+      const r = await fetch("/api/actions/admin", { headers: { "x-admin-token": token } });
       const b = await r.json();
       if (!r.ok || !b.config) { setMsg({ t: "err", s: b.error ?? `Failed (${r.status})` }); return; }
       setConfig(b.config);
@@ -47,7 +47,7 @@ export function AdminPage() {
     const u: Record<string,string> = {};
     for (const [k,v] of Object.entries(drafts)) if (v !== config[k as keyof CState]?.value) u[k] = v;
     try {
-      const r = await fetch("/api/actions/admin/config", {
+      const r = await fetch("/api/actions/admin", {
         method: "PUT", headers: { "Content-Type":"application/json", "x-admin-token":token }, body: JSON.stringify({ updates: u }),
       });
       const b = await r.json();
@@ -63,7 +63,7 @@ export function AdminPage() {
     setTk(key);
     try {
       const heavy = key === "LLM_HEAVY_MODEL";
-      const r = await fetch("/api/actions/admin/config/test", {
+      const r = await fetch("/api/actions/admin", {
         method: "POST", headers: { "Content-Type":"application/json", "x-admin-token":token },
         body: JSON.stringify({ role: heavy ? "heavy" : "fast", model_spec: spec }),
       });
