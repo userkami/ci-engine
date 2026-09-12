@@ -569,6 +569,10 @@ async def admin_test_config(
         )
 
 
+@app.get(
+    "/api/battlecards/{battlecard_id}",
+    response_model=BattlecardResponse,
+)
 async def get_battlecard(
     battlecard_id: uuid.UUID,
     user: User = Depends(get_current_user),

@@ -75,6 +75,10 @@ class DeploymentTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get(f"/api/jobs/{uuid.uuid4()}/stream")
         self.assertEqual(response.status_code, 401)
 
+    async def test_battlecard_route_requires_login(self):
+        response = await self.client.get(f"/api/battlecards/{uuid.uuid4()}")
+        self.assertEqual(response.status_code, 401)
+
     async def test_stream_rejects_other_users_job(self):
         self.api.app.dependency_overrides[self.api.get_current_user] = lambda: SimpleNamespace(id=uuid.uuid4())
         self.db.get.return_value = SimpleNamespace(user_id=uuid.uuid4())
