@@ -535,14 +535,21 @@ async def admin_test_config(
     from langchain.chat_models import init_chat_model
     from langchain_core.messages import HumanMessage
 
-    from app.core.llm import _apply_provider_overrides, _split_model_spec
+    from app.core.llm import (
+        _apply_provider_overrides,
+        _effective_model_provider,
+        _split_model_spec,
+    )
 
     model, provider = _split_model_spec(body.model_spec.strip())
     model_kwargs: dict = {"temperature": 0.0}
     await _apply_provider_overrides(provider, model_kwargs)
+    effective_provider = _effective_model_provider(provider)
 
     try:
-        instance = init_chat_model(model, model_provider=provider, **model_kwargs)
+        instance = init_chat_model(
+            model, model_provider=effective_provider, **model_kwargs
+        )
     except Exception as exc:
         return AdminConfigTestResponse(
             ok=False,

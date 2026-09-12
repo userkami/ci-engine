@@ -87,9 +87,10 @@ async def get_chat_model(role: str = "fast", **kwargs: Any) -> BaseChatModel:
     model, provider = _split_model_spec(spec)
     kwargs.setdefault("temperature", 0.0)
     await _apply_provider_overrides(provider, kwargs)
+    effective_provider = _effective_model_provider(provider)
 
     try:
-        return init_chat_model(model, model_provider=provider, **kwargs)
+        return init_chat_model(model, model_provider=effective_provider, **kwargs)
     except Exception as exc:  # noqa: BLE001 - surface the real cause
         raise ModelConfigError(
             f"could not initialise role {role!r} from {config_key}={spec!r}. "
@@ -112,7 +113,6 @@ async def _apply_provider_overrides(
 ) -> None:
     """Inject provider-specific settings (base URL, API key) for OpenRouter."""
     if provider == "openrouter":
-        kwargs.setdefault("model_provider", "openai")
         kwargs.setdefault("base_url", _OPENROUTER_BASE_URL)
         key = await config_service.get_config("OPENROUTER_API_KEY")
         if not key:
@@ -121,6 +121,16 @@ async def _apply_provider_overrides(
             kwargs.setdefault("api_key", key)
     else:
         _inject_api_key(provider, kwargs)
+
+
+def _effective_model_provider(provider: str | None) -> str | None:
+    """Return the installed LangChain provider used for a model spec.
+
+    OpenRouter exposes an OpenAI-compatible API and this project installs
+    ``langchain-openai``, so OpenRouter model IDs must be instantiated via
+    that provider while retaining their complete IDs (including ``:free``).
+    """
+    return "openai" if provider == "openrouter" else provider
 
 
 def _inject_api_key(provider: str | None, kwargs: dict[str, Any]) -> None:
